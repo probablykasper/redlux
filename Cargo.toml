@@ -1,0 +1,25 @@
+[package]
+name = "redlux"
+version = "0.1.0"
+description = "AAC decoder for MPEG-4 (MP4, M4A etc) and AAC files"
+authors = ["Kasper Henningsen"]
+edition = "2018"
+readme = "README.md"
+license = "MIT"
+homepage = "https://github.com/probablykasper/redlux#readme"
+repository = "https://github.com/probablykasper/redlux"
+documentation = "https://docs.rs/redlux"
+keywords = ["aac", "mp4", "m4a", "decoder", "rodio"]
+categories = ["multimedia::audio"]
+
+[dependencies]
+# mp4 = "0.8.0"
+mp4 = { git = "https://github.com/alfg/mp4-rust", branch = "bugfix/read-largesize-boxheader-size" }
+fdk-aac = "0.4.0"
+rodio = { version = "0.13.0", default-features = false }
+
+[dev-dependencies]
+
+# [features]
+# default = ["mpeg"]
+# rodio = ["rodio-source"]
