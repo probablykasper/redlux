@@ -1,11 +1,12 @@
+//! AAC decoder for MPEG-4 (MP4, M4A etc) and AAC files. Supports rodio.
 use fdk_aac::dec::{Decoder as AacDecoder, DecoderError, Transport};
-use std::error;
-use std::fmt;
 use std::io::{Read, Seek};
 use std::time::Duration;
+use std::{error, fmt, io};
 
 pub mod adts;
 
+/// Redlux error
 #[derive(Debug)]
 pub enum Error {
   /// Error reading header of file
@@ -19,6 +20,8 @@ pub enum Error {
   TrackDecodingError(DecoderError),
   /// Error getting samples
   SamplesError,
+  /// Error from the underlying reader R
+  ReaderError(io::Error),
 }
 
 impl error::Error for Error {}
@@ -29,11 +32,13 @@ impl fmt::Display for Error {
   }
 }
 
+/// File container format
 pub enum Format {
   Mp4,
   Aac,
 }
 
+/// Underlying reader
 pub enum Reader<R> {
   Mp4Reader(mp4::Mp4Reader<R>),
   AacReader(R),
@@ -51,13 +56,15 @@ where
   current_pcm: Vec<i16>,
   track_id: u32,
   position: u32,
-  pub decoder_error: Option<Error>,
+  /// If there's an error while iterating over the Decoder, that error is added here
+  pub iter_error: Option<Error>,
 }
 
 impl<R> Decoder<R>
 where
   R: Read + Seek,
 {
+  /// Create from an aac buffer
   pub fn new_aac(reader: R) -> Self {
     let aac_decoder = AacDecoder::new(Transport::Adts);
     let aac_decoder = Decoder {
@@ -69,10 +76,11 @@ where
       current_pcm: Vec::new(),
       track_id: 0,
       position: 1,
-      decoder_error: None,
+      iter_error: None,
     };
     return aac_decoder;
   }
+  /// Create from an mpeg buffer
   pub fn new_mpeg4(reader: R, size: u64) -> Result<Self, Error> {
     let aac_decoder = AacDecoder::new(Transport::Adts);
     let mp4 = mp4::Mp4Reader::read_header(reader, size).or(Err(Error::FileHeaderError))?;
@@ -103,7 +111,7 @@ where
           current_pcm: Vec::new(),
           track_id: track_id,
           position: 1,
-          decoder_error: None,
+          iter_error: None,
         });
       }
       None => {
@@ -126,14 +134,8 @@ where
   pub fn total_duration(&self) -> Option<Duration> {
     return None;
   }
-}
-
-impl<R> Iterator for Decoder<R>
-where
-  R: Read + Seek,
-{
-  type Item = i16;
-  fn next(&mut self) -> Option<i16> {
+  /// Consume and return the next sample, or None when finished
+  pub fn decode_next_sample(&mut self) -> Result<Option<i16>, Error> {
     if self.current_pcm_index == self.current_pcm.len() {
       let mut pcm = vec![0; 8192];
       let result = match self.aac_decoder.decode_frame(&mut pcm) {
@@ -142,42 +144,20 @@ where
             // mp4
             Reader::Mp4Reader(mp4_reader) => {
               let sample_result = mp4_reader.read_sample(self.track_id, self.position);
-              let sample = match sample_result {
-                Ok(sample) => sample?, // None if EOF
-                Err(_) => {
-                  self.decoder_error = Some(Error::SamplesError);
-                  return None;
-                }
+              let sample_opt = sample_result.or(Err(Error::SamplesError))?;
+              let sample = match sample_opt {
+                Some(sample) => sample,
+                None => return Ok(None), // EOF
               };
               let tracks = mp4_reader.tracks();
-              let track = match tracks.get(self.track_id as usize - 1) {
-                Some(track) => track,
-                None => {
-                  self.decoder_error = Some(Error::TrackNotFound);
-                  return None;
-                }
-              };
-              let object_type = match track.audio_profile() {
-                Ok(value) => value,
-                Err(_) => {
-                  self.decoder_error = Some(Error::TrackReadingError);
-                  return None;
-                }
-              };
-              let sample_freq_index = match track.sample_freq_index() {
-                Ok(value) => value,
-                Err(_) => {
-                  self.decoder_error = Some(Error::TrackReadingError);
-                  return None;
-                }
-              };
-              let channel_config = match track.channel_config() {
-                Ok(value) => value,
-                Err(_) => {
-                  self.decoder_error = Some(Error::TrackReadingError);
-                  return None;
-                }
-              };
+              let track = tracks
+                .get(self.track_id as usize - 1)
+                .ok_or(Error::TrackNotFound)?;
+              let object_type = track.audio_profile().or(Err(Error::TrackReadingError))?;
+              let sample_freq_index = track
+                .sample_freq_index()
+                .or(Err(Error::TrackReadingError))?;
+              let channel_config = track.channel_config().or(Err(Error::TrackReadingError))?;
               let adts_header = adts::construct_adts_header(
                 object_type,
                 sample_freq_index,
@@ -194,10 +174,10 @@ where
               let mut new_bytes = vec![0; 8192 - old_bytes_len];
               let bytes_read = match aac_reader.read(&mut new_bytes) {
                 Ok(bytes_read) => bytes_read,
-                Err(_) => return None,
+                Err(err) => return Err(Error::ReaderError(err)),
               };
               if bytes_read == 0 {
-                return None;
+                return Ok(None); // EOF
               }
               // aac files already have adts headers
               self.bytes.extend(new_bytes);
@@ -205,19 +185,15 @@ where
           }
           let bytes_filled = match self.aac_decoder.fill(&self.bytes) {
             Ok(bytes_filled) => bytes_filled,
-            Err(_) => return None,
+            Err(err) => return Err(Error::TrackDecodingError(err)),
           };
           self.bytes = self.bytes[bytes_filled..].to_vec();
           self.aac_decoder.decode_frame(&mut pcm)
         }
         val => val,
       };
-      match result {
-        Ok(_) => {}
-        Err(err) => {
-          self.decoder_error = Some(Error::TrackDecodingError(err));
-          return None;
-        }
+      if let Err(err) = result {
+        return Err(Error::TrackDecodingError(err));
       }
       let decoded_frame_size = self.aac_decoder.decoded_frame_size();
       if decoded_frame_size < pcm.len() {
@@ -228,7 +204,26 @@ where
     }
     let value = self.current_pcm[self.current_pcm_index];
     self.current_pcm_index += 1;
-    return Some(value);
+    return Ok(Some(value));
+  }
+}
+
+impl<R> Iterator for Decoder<R>
+where
+  R: Read + Seek,
+{
+  type Item = i16;
+  /// Runs decode_next_sample and returns the sample from that. Once the
+  /// iterator is finished, it returns None. If there's an error, it's added
+  /// to the iter_error error.
+  fn next(&mut self) -> Option<i16> {
+    match self.decode_next_sample() {
+      Ok(sample) => sample,
+      Err(err) => {
+        self.iter_error = Some(err);
+        return None;
+      }
+    }
   }
 }
 
