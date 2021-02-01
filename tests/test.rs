@@ -14,7 +14,7 @@ fn play_m4a() {
   let size = metadata.len();
   let buf = BufReader::new(file);
 
-  let decoder = Decoder::new(buf, size).expect("Error creating M4aDecoder");
+  let decoder = Decoder::new_mpeg4(buf, size).expect("Error creating M4aDecoder");
 
   let output_stream = OutputStream::try_default();
   let (_stream, handle) = output_stream.expect("Error creating output stream");

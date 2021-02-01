@@ -4,12 +4,24 @@ use std::time::Duration;
 
 pub mod adts;
 
+pub enum Format {
+  Mp4,
+  Aac,
+}
+
+pub enum Reader<R> {
+  Mp4Reader(mp4::Mp4Reader<R>),
+  AacReader(R),
+}
+
 pub struct Decoder<R>
 where
   R: Read + Seek,
 {
-  mp4_reader: mp4::Mp4Reader<R>,
+  pub format: Format,
+  reader: Reader<R>,
   aac_decoder: AacDecoder,
+  bytes: Vec<u8>,
   current_pcm_index: usize,
   current_pcm: Vec<i16>,
   track_id: u32,
@@ -20,8 +32,23 @@ impl<R> Decoder<R>
 where
   R: Read + Seek,
 {
-  pub fn new(reader: R, size: u64) -> Result<Decoder<R>, &'static str> {
-    let decoder = AacDecoder::new(Transport::Adts);
+  pub fn new_aac(reader: R) -> Result<Decoder<R>, &'static str> {
+    let aac_decoder = AacDecoder::new(Transport::Adts);
+    let aac_decoder = Decoder {
+      format: Format::Aac,
+      reader: Reader::AacReader(reader),
+      aac_decoder: aac_decoder,
+      bytes: Vec::new(),
+      current_pcm_index: 0,
+      current_pcm: Vec::new(),
+      track_id: 0,
+      position: 1,
+    };
+    // aac_decoder.next();
+    Ok(aac_decoder)
+  }
+  pub fn new_mpeg4(reader: R, size: u64) -> Result<Decoder<R>, &'static str> {
+    let aac_decoder = AacDecoder::new(Transport::Adts);
     let mp4 = mp4::Mp4Reader::read_header(reader, size).or(Err("Error reading MPEG header"))?;
     let mut track_id: Option<u32> = None;
     {
@@ -39,8 +66,10 @@ where
     match track_id {
       Some(track_id) => {
         return Ok(Decoder {
-          mp4_reader: mp4,
-          aac_decoder: decoder,
+          format: Format::Mp4,
+          reader: Reader::Mp4Reader(mp4),
+          aac_decoder: aac_decoder,
+          bytes: Vec::new(),
           current_pcm_index: 0,
           current_pcm: Vec::new(),
           track_id: track_id,
@@ -77,38 +106,55 @@ where
   fn next(&mut self) -> Option<i16> {
     if self.current_pcm_index == self.current_pcm.len() {
       let mut pcm = vec![0; 8192];
-      let result = match self.aac_decoder.decode_frame(&mut self.current_pcm) {
+      let result = match self.aac_decoder.decode_frame(&mut pcm) {
         Err(DecoderError::NOT_ENOUGH_BITS) => {
-          let sample_result = self.mp4_reader.read_sample(self.track_id, self.position);
-          let sample = match sample_result {
-            Ok(sample) => sample?, // None if EOF
-            Err(_) => {
-              println!("Error reading sample");
-              return None;
+          match &mut self.reader {
+            // mp4
+            Reader::Mp4Reader(mp4_reader) => {
+              let sample_result = mp4_reader.read_sample(self.track_id, self.position);
+              let sample = match sample_result {
+                Ok(sample) => sample?, // None if EOF
+                Err(_) => {
+                  println!("Error reading sample");
+                  return None;
+                }
+              };
+              let tracks = mp4_reader.tracks();
+              let track = match tracks.get(self.track_id as usize - 1) {
+                Some(track) => track,
+                None => {
+                  println!("No track ID there");
+                  return None;
+                }
+              };
+              let adts_header = match adts::construct_adts_header(track, &sample) {
+                Some(bytes) => bytes,
+                None => {
+                  println!("Error getting adts header bytes");
+                  return None;
+                }
+              };
+              let adts_bytes = mp4::Bytes::copy_from_slice(&adts_header);
+              self.bytes = [adts_bytes, sample.bytes].concat();
+              self.position += 1;
             }
-          };
-          let tracks = self.mp4_reader.tracks();
-          let track = match tracks.get(self.track_id as usize - 1) {
-            Some(track) => track,
-            None => {
-              println!("No track ID there");
-              return None;
+            // aac
+            Reader::AacReader(aac_reader) => {
+              let old_bytes_len = self.bytes.len();
+              let mut new_bytes = vec![0; 8192 - old_bytes_len];
+              let bytes_read = match aac_reader.read(&mut new_bytes) {
+                Ok(bytes_read) => bytes_read,
+                Err(_) => return None,
+              };
+              // aac files already have adts headers
+              self.bytes.extend(new_bytes);
             }
-          };
-          let adts_header = match adts::construct_adts_header(track, &sample) {
-            Some(bytes) => bytes,
-            None => {
-              println!("Error getting adts header bytes");
-              return None;
-            }
-          };
-          let adts_bytes = mp4::Bytes::copy_from_slice(&adts_header);
-          let bytes = [adts_bytes, sample.bytes].concat();
-          self.position += 1;
-          let _bytes_read = match self.aac_decoder.fill(&bytes) {
-            Ok(bytes_read) => bytes_read,
+          }
+          let bytes_filled = match self.aac_decoder.fill(&self.bytes) {
+            Ok(bytes_filled) => bytes_filled,
             Err(_) => return None,
           };
+          self.bytes = self.bytes[bytes_filled..].to_vec();
           self.aac_decoder.decode_frame(&mut pcm)
         }
         val => val,
@@ -120,9 +166,9 @@ where
           return None;
         }
       }
-      let decoded_fram_size = self.aac_decoder.decoded_frame_size();
-      if decoded_fram_size < pcm.len() {
-        let _ = pcm.split_off(decoded_fram_size);
+      let decoded_frame_size = self.aac_decoder.decoded_frame_size();
+      if decoded_frame_size < pcm.len() {
+        let _ = pcm.split_off(decoded_frame_size);
       }
       self.current_pcm = pcm;
       self.current_pcm_index = 0;

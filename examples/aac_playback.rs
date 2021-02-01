@@ -4,14 +4,11 @@ use std::fs::File;
 use std::io::BufReader;
 
 fn main() {
-  let path = "tests/samples/Simbai & Elke Bay - Energy.m4a";
+  let path = "tests/samples/Simbai & Elke Bay - Energy.aac";
   let file = File::open(path).expect("Error opening file");
-
-  let metadata = file.metadata().expect("Error getting file metadata");
-  let size = metadata.len();
   let buf = BufReader::new(file);
 
-  let decoder = Decoder::new_mpeg4(buf, size).expect("Error creating M4aDecoder");
+  let decoder = Decoder::new_aac(buf).expect("Error creating Decoder");
 
   let output_stream = OutputStream::try_default();
   let (_stream, handle) = output_stream.expect("Error creating output stream");
