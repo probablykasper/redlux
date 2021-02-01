@@ -13,8 +13,7 @@ keywords = ["aac", "mp4", "m4a", "decoder", "rodio"]
 categories = ["multimedia::audio"]
 
 [dependencies]
-# mp4 = "0.8.0"
-mp4 = { git = "https://github.com/alfg/mp4-rust", branch = "bugfix/read-largesize-boxheader-size" }
+mp4 = "0.8.1"
 fdk-aac = "0.4.0"
 rodio = { version = "0.13.0", default-features = false }
 

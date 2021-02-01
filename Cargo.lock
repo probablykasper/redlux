@@ -616,8 +616,9 @@ dependencies = [
 
 [[package]]
 name = "mp4"
-version = "0.8.0"
-source = "git+https://github.com/alfg/mp4-rust?branch=bugfix/read-largesize-boxheader-size#b757d90627a5c1610bb253ff663fbebdddd08a57"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "999db0cca8fd8c1b2352f362691bdafbd90069efd581144066a7909895d23b86"
 dependencies = [
  "byteorder",
  "bytes 0.5.6",
