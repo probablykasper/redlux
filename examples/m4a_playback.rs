@@ -2,11 +2,8 @@ use redlux::Decoder;
 use rodio::{OutputStream, Sink};
 use std::fs::File;
 use std::io::BufReader;
-use std::thread;
-use std::time::Duration;
 
-#[test]
-fn play_m4a() {
+fn main() {
   let path = "tests/samples/Simbai & Elke Bay - Energy.m4a";
   let file = File::open(path).expect("Error opening file");
 
@@ -22,7 +19,6 @@ fn play_m4a() {
 
   sink.append(decoder);
   sink.play();
-  // play audio for 200ms at 0.0 volume
-  sink.set_volume(0.0);
-  thread::sleep(Duration::from_millis(200));
+  sink.set_volume(0.5);
+  sink.sleep_until_end();
 }
