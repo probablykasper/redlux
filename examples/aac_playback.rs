@@ -8,7 +8,7 @@ fn main() {
   let file = File::open(path).expect("Error opening file");
   let buf = BufReader::new(file);
 
-  let decoder = Decoder::new_aac(buf).expect("Error creating Decoder");
+  let decoder = Decoder::new_aac(buf);
 
   let output_stream = OutputStream::try_default();
   let (_stream, handle) = output_stream.expect("Error creating output stream");

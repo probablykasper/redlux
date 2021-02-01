@@ -19,7 +19,3 @@ fdk-aac = "0.4.0"
 rodio = { version = "0.13.0", default-features = false }
 
 [dev-dependencies]
-
-# [features]
-# default = ["mpeg"]
-# rodio = ["rodio-source"]

@@ -1,8 +1,33 @@
 use fdk_aac::dec::{Decoder as AacDecoder, DecoderError, Transport};
+use std::error;
+use std::fmt;
 use std::io::{Read, Seek};
 use std::time::Duration;
 
 pub mod adts;
+
+#[derive(Debug)]
+pub enum Error {
+  /// Error reading header of file
+  FileHeaderError,
+  /// Unable to get information about a track, such as audio profile, sample
+  /// frequency or channel config.
+  TrackReadingError,
+  // Unable to find track  in file
+  TrackNotFound,
+  /// Error decoding track
+  TrackDecodingError(DecoderError),
+  /// Error getting samples
+  SamplesError,
+}
+
+impl error::Error for Error {}
+
+impl fmt::Display for Error {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "Oh no, something bad went down")
+  }
+}
 
 pub enum Format {
   Mp4,
@@ -26,13 +51,14 @@ where
   current_pcm: Vec<i16>,
   track_id: u32,
   position: u32,
+  pub decoder_error: Option<Error>,
 }
 
 impl<R> Decoder<R>
 where
   R: Read + Seek,
 {
-  pub fn new_aac(reader: R) -> Result<Decoder<R>, &'static str> {
+  pub fn new_aac(reader: R) -> Self {
     let aac_decoder = AacDecoder::new(Transport::Adts);
     let aac_decoder = Decoder {
       format: Format::Aac,
@@ -43,17 +69,20 @@ where
       current_pcm: Vec::new(),
       track_id: 0,
       position: 1,
+      decoder_error: None,
     };
-    // aac_decoder.next();
-    Ok(aac_decoder)
+    return aac_decoder;
   }
-  pub fn new_mpeg4(reader: R, size: u64) -> Result<Decoder<R>, &'static str> {
+  pub fn new_mpeg4(reader: R, size: u64) -> Result<Self, Error> {
     let aac_decoder = AacDecoder::new(Transport::Adts);
-    let mp4 = mp4::Mp4Reader::read_header(reader, size).or(Err("Error reading MPEG header"))?;
+    let mp4 = mp4::Mp4Reader::read_header(reader, size).or(Err(Error::FileHeaderError))?;
     let mut track_id: Option<u32> = None;
     {
       for track in mp4.tracks().iter() {
-        let media_type = track.media_type().or(Err("Error getting media type"))?;
+        let media_type = match track.media_type() {
+          Ok(media_type) => media_type,
+          Err(_) => continue,
+        };
         match media_type {
           mp4::MediaType::AAC => {
             track_id = Some(track.track_id());
@@ -74,10 +103,11 @@ where
           current_pcm: Vec::new(),
           track_id: track_id,
           position: 1,
+          decoder_error: None,
         });
       }
       None => {
-        return Err("No aac track found");
+        return Err(Error::TrackNotFound);
       }
     }
   }
@@ -115,7 +145,7 @@ where
               let sample = match sample_result {
                 Ok(sample) => sample?, // None if EOF
                 Err(_) => {
-                  println!("Error reading sample");
+                  self.decoder_error = Some(Error::SamplesError);
                   return None;
                 }
               };
@@ -123,17 +153,37 @@ where
               let track = match tracks.get(self.track_id as usize - 1) {
                 Some(track) => track,
                 None => {
-                  println!("No track ID there");
+                  self.decoder_error = Some(Error::TrackNotFound);
                   return None;
                 }
               };
-              let adts_header = match adts::construct_adts_header(track, &sample) {
-                Some(bytes) => bytes,
-                None => {
-                  println!("Error getting adts header bytes");
+              let object_type = match track.audio_profile() {
+                Ok(value) => value,
+                Err(_) => {
+                  self.decoder_error = Some(Error::TrackReadingError);
                   return None;
                 }
               };
+              let sample_freq_index = match track.sample_freq_index() {
+                Ok(value) => value,
+                Err(_) => {
+                  self.decoder_error = Some(Error::TrackReadingError);
+                  return None;
+                }
+              };
+              let channel_config = match track.channel_config() {
+                Ok(value) => value,
+                Err(_) => {
+                  self.decoder_error = Some(Error::TrackReadingError);
+                  return None;
+                }
+              };
+              let adts_header = adts::construct_adts_header(
+                object_type,
+                sample_freq_index,
+                channel_config,
+                &sample,
+              );
               let adts_bytes = mp4::Bytes::copy_from_slice(&adts_header);
               self.bytes = [adts_bytes, sample.bytes].concat();
               self.position += 1;
@@ -165,7 +215,7 @@ where
       match result {
         Ok(_) => {}
         Err(err) => {
-          println!("DecoderError: {}", err);
+          self.decoder_error = Some(Error::TrackDecodingError(err));
           return None;
         }
       }

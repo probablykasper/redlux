@@ -1,3 +1,4 @@
+use mp4::{AudioObjectType, ChannelConfig, Mp4Sample, SampleFreqIndex};
 use std::ops::Range;
 
 fn get_bits(byte: u16, range: Range<u16>) -> u16 {
@@ -14,7 +15,12 @@ fn get_bits_u8(byte: u8, range: Range<u8>) -> u8 {
   return shave_right;
 }
 
-pub fn construct_adts_header(track: &mp4::Mp4Track, sample: &mp4::Mp4Sample) -> Option<Vec<u8>> {
+pub fn construct_adts_header(
+  object_type: AudioObjectType,
+  sample_freq_index: SampleFreqIndex,
+  channel_config: ChannelConfig,
+  sample: &Mp4Sample,
+) -> Vec<u8> {
   // ADTS header wiki reference: https://wiki.multimedia.cx/index.php/ADTS#:~:text=Audio%20Data%20Transport%20Stream%20(ADTS,to%20stream%20audio%2C%20usually%20AAC.
 
   // byte7 and byte9 not included without CRC
@@ -29,48 +35,45 @@ pub fn construct_adts_header(track: &mp4::Mp4Track, sample: &mp4::Mp4Sample) -> 
 
   // EEFF_FFGH
   let mut byte2 = 0b0000_0000;
-  let object_type = match track.audio_profile() {
-    Ok(mp4::AudioObjectType::AacMain) => 1,
-    Ok(mp4::AudioObjectType::AacLowComplexity) => 2,
-    Ok(mp4::AudioObjectType::AacScalableSampleRate) => 3,
-    Ok(mp4::AudioObjectType::AacLongTermPrediction) => 4,
-    Err(_) => return None,
+  let object_type = match object_type {
+    AudioObjectType::AacMain => 1,
+    AudioObjectType::AacLowComplexity => 2,
+    AudioObjectType::AacScalableSampleRate => 3,
+    AudioObjectType::AacLongTermPrediction => 4,
   };
   let adts_object_type = object_type - 1;
   byte2 = (byte2 << 2) | adts_object_type; // EE
 
-  let sample_freq_index = match track.sample_freq_index() {
-    Ok(mp4::SampleFreqIndex::Freq96000) => 0,
-    Ok(mp4::SampleFreqIndex::Freq88200) => 1,
-    Ok(mp4::SampleFreqIndex::Freq64000) => 2,
-    Ok(mp4::SampleFreqIndex::Freq48000) => 3,
-    Ok(mp4::SampleFreqIndex::Freq44100) => 4,
-    Ok(mp4::SampleFreqIndex::Freq32000) => 5,
-    Ok(mp4::SampleFreqIndex::Freq24000) => 6,
-    Ok(mp4::SampleFreqIndex::Freq22050) => 7,
-    Ok(mp4::SampleFreqIndex::Freq16000) => 8,
-    Ok(mp4::SampleFreqIndex::Freq12000) => 9,
-    Ok(mp4::SampleFreqIndex::Freq11025) => 10,
-    Ok(mp4::SampleFreqIndex::Freq8000) => 11,
-    Ok(mp4::SampleFreqIndex::Freq7350) => 12,
+  let sample_freq_index = match sample_freq_index {
+    SampleFreqIndex::Freq96000 => 0,
+    SampleFreqIndex::Freq88200 => 1,
+    SampleFreqIndex::Freq64000 => 2,
+    SampleFreqIndex::Freq48000 => 3,
+    SampleFreqIndex::Freq44100 => 4,
+    SampleFreqIndex::Freq32000 => 5,
+    SampleFreqIndex::Freq24000 => 6,
+    SampleFreqIndex::Freq22050 => 7,
+    SampleFreqIndex::Freq16000 => 8,
+    SampleFreqIndex::Freq12000 => 9,
+    SampleFreqIndex::Freq11025 => 10,
+    SampleFreqIndex::Freq8000 => 11,
+    SampleFreqIndex::Freq7350 => 12,
     // 13-14 = reserved
     // 15 = explicit frequency (forbidden in adts)
-    Err(_) => return None,
   };
   byte2 = (byte2 << 4) | sample_freq_index; // FFFF
   byte2 = (byte2 << 1) | 0b1; // G
 
-  let channel_config = match track.channel_config() {
+  let channel_config = match channel_config {
     // 0 = for when channel config is sent via an inband PCE
-    Ok(mp4::ChannelConfig::Mono) => 1,
-    Ok(mp4::ChannelConfig::Stereo) => 2,
-    Ok(mp4::ChannelConfig::Three) => 3,
-    Ok(mp4::ChannelConfig::Four) => 4,
-    Ok(mp4::ChannelConfig::Five) => 5,
-    Ok(mp4::ChannelConfig::FiveOne) => 6,
-    Ok(mp4::ChannelConfig::SevenOne) => 7,
+    ChannelConfig::Mono => 1,
+    ChannelConfig::Stereo => 2,
+    ChannelConfig::Three => 3,
+    ChannelConfig::Four => 4,
+    ChannelConfig::Five => 5,
+    ChannelConfig::FiveOne => 6,
+    ChannelConfig::SevenOne => 7,
     // 8-15 = reserved
-    Err(_) => return None,
   };
   byte2 = (byte2 << 1) | get_bits_u8(channel_config, 6..6); // H
 
@@ -95,5 +98,5 @@ pub fn construct_adts_header(track: &mp4::Mp4Track, sample: &mp4::Mp4Sample) -> 
   byte6 = (byte6 << 6) | 0b111111; // OOOOOO
   byte6 = (byte6 << 2) | 0b00; // PP
 
-  return Some(vec![byte0, byte1, byte2, byte3, byte4, byte5, byte6]);
+  return vec![byte0, byte1, byte2, byte3, byte4, byte5, byte6];
 }
