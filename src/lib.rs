@@ -107,7 +107,7 @@ where
     if self.current_pcm_index == self.current_pcm.len() {
       let mut pcm = vec![0; 8192];
       let result = match self.aac_decoder.decode_frame(&mut pcm) {
-        Err(DecoderError::NOT_ENOUGH_BITS) => {
+        Err(DecoderError::NOT_ENOUGH_BITS) | Err(DecoderError::TRANSPORT_SYNC_ERROR) => {
           match &mut self.reader {
             // mp4
             Reader::Mp4Reader(mp4_reader) => {
@@ -146,6 +146,9 @@ where
                 Ok(bytes_read) => bytes_read,
                 Err(_) => return None,
               };
+              if bytes_read == 0 {
+                return None;
+              }
               // aac files already have adts headers
               self.bytes.extend(new_bytes);
             }
