@@ -1,7 +1,7 @@
 [package]
 name = "redlux"
 version = "0.2.0"
-description = "AAC decoder for MPEG-4 (MP4, M4A etc) and AAC files"
+description = "AAC decoder for MPEG-4 (MP4, M4A etc) and AAC files, with rodio support"
 authors = ["Kasper Henningsen"]
 edition = "2018"
 readme = "README.md"
