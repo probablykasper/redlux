@@ -14,7 +14,7 @@ pub enum Error {
   /// Unable to get information about a track, such as audio profile, sample
   /// frequency or channel config.
   TrackReadingError,
-  // Unable to find track  in file
+  // Unable to find track in file
   TrackNotFound,
   /// Error decoding track
   TrackDecodingError(DecoderError),
@@ -25,6 +25,19 @@ pub enum Error {
 }
 
 impl error::Error for Error {}
+
+impl Error {
+  pub fn message(&self) -> &'static str {
+    match &self {
+      Error::FileHeaderError => "Error reading file header",
+      Error::TrackReadingError => "Error reading file track info",
+      Error::TrackNotFound => "Unable to find track in file",
+      Error::TrackDecodingError(_) => "Error decoding track",
+      Error::SamplesError => "Error reading samples",
+      Error::ReaderError(_) => "Error reading file",
+    }
+  }
+}
 
 impl fmt::Display for Error {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
