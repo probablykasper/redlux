@@ -40,6 +40,10 @@ pub fn construct_adts_header(
     AudioObjectType::AacLowComplexity => 2,
     AudioObjectType::AacScalableSampleRate => 3,
     AudioObjectType::AacLongTermPrediction => 4,
+    // types 5 (SBR) and 29 (PS) can be coerced down to type 2 (AAC-LC)
+    AudioObjectType::SpectralBandReplication => 2,
+    AudioObjectType::ParametricStereo => 2,
+    x => panic!("Unsupported object type {}", x),
   };
   let adts_object_type = object_type - 1;
   byte2 = (byte2 << 2) | adts_object_type; // EE
