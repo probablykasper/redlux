@@ -1,5 +1,6 @@
 //! AAC decoder for MPEG-4 (MP4, M4A etc) and AAC files. Supports rodio.
 use fdk_aac::dec::{Decoder as AacDecoder, DecoderError, Transport};
+use mp4::AudioObjectType;
 use std::io::{Read, Seek};
 use std::time::Duration;
 use std::{error, fmt, io};
@@ -14,6 +15,8 @@ pub enum Error {
   /// Unable to get information about a track, such as audio profile, sample
   /// frequency or channel config.
   TrackReadingError,
+  /// Unsupported audio object type
+  UnsupportedObjectType(AudioObjectType),
   // Unable to find track in file
   TrackNotFound,
   /// Error decoding track
@@ -31,6 +34,7 @@ impl Error {
     match &self {
       Error::FileHeaderError => "Error reading file header",
       Error::TrackReadingError => "Error reading file track info",
+      Error::UnsupportedObjectType(_) => "Unsupported audio object type",
       Error::TrackNotFound => "Unable to find track in file",
       Error::TrackDecodingError(_) => "Error decoding track",
       Error::SamplesError => "Error reading samples",
@@ -176,7 +180,7 @@ where
                 sample_freq_index,
                 channel_config,
                 &sample,
-              );
+              )?;
               let adts_bytes = mp4::Bytes::copy_from_slice(&adts_header);
               self.bytes = [adts_bytes, sample.bytes].concat();
               self.position += 1;

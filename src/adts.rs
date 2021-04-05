@@ -1,5 +1,6 @@
 use mp4::{AudioObjectType, ChannelConfig, Mp4Sample, SampleFreqIndex};
 use std::ops::Range;
+use crate::Error;
 
 fn get_bits(byte: u16, range: Range<u16>) -> u16 {
   let shaved_left = byte << range.start - 1;
@@ -20,7 +21,7 @@ pub fn construct_adts_header(
   sample_freq_index: SampleFreqIndex,
   channel_config: ChannelConfig,
   sample: &Mp4Sample,
-) -> Vec<u8> {
+) -> Result<Vec<u8>, Error> {
   // ADTS header wiki reference: https://wiki.multimedia.cx/index.php/ADTS#:~:text=Audio%20Data%20Transport%20Stream%20(ADTS,to%20stream%20audio%2C%20usually%20AAC.
 
   // byte7 and byte9 not included without CRC
@@ -40,10 +41,12 @@ pub fn construct_adts_header(
     AudioObjectType::AacLowComplexity => 2,
     AudioObjectType::AacScalableSampleRate => 3,
     AudioObjectType::AacLongTermPrediction => 4,
-    // types 5 (SBR) and 29 (PS) can be coerced down to type 2 (AAC-LC)
-    AudioObjectType::SpectralBandReplication => 2,
-    AudioObjectType::ParametricStereo => 2,
-    x => panic!("Unsupported object type {}", x),
+    // Audio object types 5 (SBR) and 29 (PS) are coerced to type 2 (AAC-LC).
+    // The decoder will have to detect SBR/PS. This is called "Implicit
+    // Signaling" and it's the only option for ADTS.
+    AudioObjectType::SpectralBandReplication => 2, // SBR, needed to support HE-AAC v1
+    AudioObjectType::ParametricStereo => 2, // PS, needed to support HE-AAC v2
+    aot => return Err(Error::UnsupportedObjectType(aot)),
   };
   let adts_object_type = object_type - 1;
   byte2 = (byte2 << 2) | adts_object_type; // EE
@@ -102,5 +105,5 @@ pub fn construct_adts_header(
   byte6 = (byte6 << 6) | 0b111111; // OOOOOO
   byte6 = (byte6 << 2) | 0b00; // PP
 
-  return vec![byte0, byte1, byte2, byte3, byte4, byte5, byte6];
+  return Ok(vec![byte0, byte1, byte2, byte3, byte4, byte5, byte6])
 }
