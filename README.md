@@ -7,6 +7,8 @@ AAC decoder for MPEG-4 (MP4, M4A etc) and AAC files, with rodio support
 
 Reads MPEG-4 containers using [rust-mp4](https://crates.io/crates/mp4), and then constructs ADTS headers for it. Decodes AAC to PCM using [fdk-aac c-bindings](https://crates.io/crates/fdk-aac). Check the examples for usage with [rodio](https://crates.io/crates/rodio).
 
+Supports AAC-LC, HE-AAC v1 and HE-AAC v2.
+
 ## Caveats
 1. It only decodes the first AAC track it finds in an MPEG-4 container.
 2. Not sure if MPEG files with CRC are supported.

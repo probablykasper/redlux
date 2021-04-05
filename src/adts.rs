@@ -37,10 +37,7 @@ pub fn construct_adts_header(
   // EEFF_FFGH
   let mut byte2 = 0b0000_0000;
   let object_type = match object_type {
-    AudioObjectType::AacMain => 1,
     AudioObjectType::AacLowComplexity => 2,
-    AudioObjectType::AacScalableSampleRate => 3,
-    AudioObjectType::AacLongTermPrediction => 4,
     // Audio object types 5 (SBR) and 29 (PS) are coerced to type 2 (AAC-LC).
     // The decoder will have to detect SBR/PS. This is called "Implicit
     // Signaling" and it's the only option for ADTS.
