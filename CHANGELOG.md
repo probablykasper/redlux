@@ -1,3 +1,6 @@
+## 0.4.0 - 2021 Jun 9
+- Bump rodio to `0.14.0`
+
 ## 0.3.0 - 2021 Apr 5
 - Add support for HE-AAC v1 (SBR) and HE-AAC v2 (PS)
 - Return `UnsupportedObjectType` error for AAC Main/SSR/LTP
