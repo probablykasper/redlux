@@ -69,6 +69,7 @@ where
   reader: Reader<R>,
   aac_decoder: AacDecoder,
   bytes: Vec<u8>,
+  sample_index: u64,
   current_pcm_index: usize,
   current_pcm: Vec<i16>,
   track_id: u32,
@@ -77,10 +78,47 @@ where
   pub iter_error: Option<Error>,
 }
 
+pub struct MediaTime {
+  pub seconds: u64,
+  pub frac: f64,
+}
+
 impl<R> Decoder<R>
 where
   R: Read + Seek,
 {
+  pub fn seek(&mut self, to: MediaTime) -> Result<MediaTime> {
+    // symphonia mp3 seek function: https://github.com/pdeljanov/Symphonia/blob/4331015f184386f97da5fd03edfaa4f9e76eb2c7/symphonia-bundle-mp3/src/demuxer.rs#L119
+    let sample_rate = self.sample_rate();
+    let desired_time = to;
+    let current_time = self.sample_index / sample_rate;
+    // self.current_frame_len();
+
+    // If the desired time is earlier, seek to start
+    if desired_time < current_time {
+      // recreate decoder (probably not ideal)
+      self.reader.seek(std::io::SeekFrom::Start(0));
+      let aac_decoder = AacDecoder::new(Transport::Adts);
+      self.aac_decoder = aac_decoder;
+      self.bytes = Vec::new();
+      self.sample_index = 0;
+      self.current_pcm_index = 0;
+      self.current_pcm = Vec::new();
+      self.position = 1;
+      self.iter_error = None;
+    }
+
+    loop {
+      // parse frame header
+      // AAAAAAAA AAAABCCD EEFFFFGH HHIJKLMM MMMMMMMM MMMOOOOO OOOOOOPP (QQQQQQQQ QQQQQQQQ)
+      let header = ;
+      // get duration of frame
+      
+      // let header = header::parse_frame_header(header::sync_frame(&mut self.reader)?)?;
+      // let duration = SAMPLES_PER_GRANULE * header.n_granules() as u64;
+      
+    }
+  }
   /// Create from an aac buffer
   pub fn new_aac(reader: R) -> Self {
     let aac_decoder = AacDecoder::new(Transport::Adts);
@@ -89,6 +127,7 @@ where
       reader: Reader::AacReader(reader),
       aac_decoder: aac_decoder,
       bytes: Vec::new(),
+      sample_index: 0,
       current_pcm_index: 0,
       current_pcm: Vec::new(),
       track_id: 0,
@@ -124,6 +163,7 @@ where
           reader: Reader::Mp4Reader(mp4),
           aac_decoder: aac_decoder,
           bytes: Vec::new(),
+          sample_index: 0,
           current_pcm_index: 0,
           current_pcm: Vec::new(),
           track_id: track_id,
@@ -221,6 +261,7 @@ where
     }
     let value = self.current_pcm[self.current_pcm_index];
     self.current_pcm_index += 1;
+    self.sample_index += 1;
     return Ok(Some(value));
   }
 }
