@@ -37,7 +37,7 @@ cargo build
 1. Update `CHANGELOG.md`
 2. Bump the version number in `Cargo.toml`
 3. Run `cargo test`
-4. Commit and tag in format `v#.#.#`
+4. Create a git tag in format `v#.#.#`
 5. Publish on crates.io:
     1. Login by running `cargo login` and following the instructions
     2. Test publish to ensure there are no errors/warnings

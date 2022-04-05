@@ -1,3 +1,6 @@
+## 0.5.0 - 2022 Apr 5
+- Bump rodio to `0.15.0`
+
 ## 0.4.0 - 2021 Jun 9
 - Bump rodio to `0.14.0`
 
