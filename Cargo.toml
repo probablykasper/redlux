@@ -1,6 +1,6 @@
 [package]
 name = "redlux"
-version = "0.4.0"
+version = "0.5.0"
 description = "AAC decoder for MPEG-4 (MP4, M4A etc) and AAC files, with rodio support"
 authors = ["Kasper Henningsen"]
 edition = "2018"
@@ -13,6 +13,6 @@ keywords = ["aac", "mp4", "m4a", "decoder", "rodio"]
 categories = ["multimedia::audio"]
 
 [dependencies]
-mp4 = "0.8.2"
+mp4 = "0.10.0"
 fdk-aac = "0.4.0"
-rodio = { version = "0.14.0", default-features = false }
+rodio = { version = "0.15.0", default-features = false }
