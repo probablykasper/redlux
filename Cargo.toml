@@ -13,6 +13,6 @@ keywords = ["aac", "mp4", "m4a", "decoder", "rodio"]
 categories = ["multimedia::audio"]
 
 [dependencies]
-mp4 = "0.8.2"
+mp4 = "0.10.0"
 fdk-aac = "0.4.0"
-rodio = { version = "0.14.0", default-features = false }
+rodio = { version = "0.15.0", default-features = false }

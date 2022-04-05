@@ -103,7 +103,7 @@ where
     let mp4 = mp4::Mp4Reader::read_header(reader, size).or(Err(Error::FileHeaderError))?;
     let mut track_id: Option<u32> = None;
     {
-      for track in mp4.tracks().iter() {
+      for track in mp4.tracks().values() {
         let media_type = match track.media_type() {
           Ok(media_type) => media_type,
           Err(_) => continue,
@@ -168,7 +168,7 @@ where
               };
               let tracks = mp4_reader.tracks();
               let track = tracks
-                .get(self.track_id as usize - 1)
+                .get(&self.track_id)
                 .ok_or(Error::TrackNotFound)?;
               let object_type = track.audio_profile().or(Err(Error::TrackReadingError))?;
               let sample_freq_index = track
