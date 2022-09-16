@@ -1,3 +1,7 @@
+## 0.6.0 - 2022 Sep 16
+- Bump rodio to `0.16.0` for rodio API breakage in Decoder trait bounds
+- Bump mp4 to `0.12.0`
+
 ## 0.5.0 - 2022 Apr 5
 - Bump rodio to `0.15.0`
 
