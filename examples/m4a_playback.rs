@@ -4,7 +4,7 @@ use std::fs::File;
 use std::io::BufReader;
 
 fn main() {
-  let path = "/Users/k/Downloads/videoplayback.m4a";
+  let path = "tests/samples/Simbai & Elke Bay - Energy.m4a";
   let file = File::open(path).expect("Error opening file");
 
   let metadata = file.metadata().expect("Error getting file metadata");
