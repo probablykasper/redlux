@@ -628,7 +628,7 @@ dependencies = [
 
 [[package]]
 name = "redlux"
-version = "0.5.0"
+version = "0.6.0"
 dependencies = [
  "fdk-aac",
  "mp4",
