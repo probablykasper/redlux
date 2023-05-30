@@ -167,9 +167,7 @@ where
                 None => return Ok(None), // EOF
               };
               let tracks = mp4_reader.tracks();
-              let track = tracks
-                .get(&self.track_id)
-                .ok_or(Error::TrackNotFound)?;
+              let track = tracks.get(&self.track_id).ok_or(Error::TrackNotFound)?;
               let object_type = track.audio_profile().or(Err(Error::TrackReadingError))?;
               let sample_freq_index = track
                 .sample_freq_index()
@@ -244,6 +242,7 @@ where
   }
 }
 
+#[cfg(feature = "rodio")]
 impl<R> rodio::Source for Decoder<R>
 where
   R: Read + Seek,
