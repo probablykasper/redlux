@@ -1,3 +1,6 @@
+## 0.7.0 - 2023 Jun 4
+- Make `rodio` an optional (but enabled by default) feature
+
 ## 0.6.0 - 2023 Feb 4
 - Bump rodio to `0.16.0` for rodio API breakage in Decoder trait bounds
 - Bump mp4 to `0.12.0`
