@@ -15,4 +15,7 @@ categories = ["multimedia::audio"]
 [dependencies]
 mp4 = "0.12.0"
 fdk-aac = "0.4.0"
-rodio = { version = "0.16.0", default-features = false }
+rodio = { version = "0.16.0", default-features = false, optional = true }
+
+[features]
+default = [ "rodio" ]
